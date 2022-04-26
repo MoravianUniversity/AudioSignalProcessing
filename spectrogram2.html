@@ -1,0 +1,73 @@
+<!doctype html>
+
+<!-- TODO: Works, but needs to be integrated into the styles of the rest, also add a chooser for the song being played -->
+
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title>Audio Playground with Spectrogram</title>
+  <meta name="description" content="A tool for studying audio, the Fourier transform, and spectrograms">
+  <meta name="author" content="Jeffrey Bush">
+
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+</head>
+
+<body>
+
+  <script src="Spectrogram-2v00.js"></script>
+  <script src="SpectrogramPlayer.js"></script>
+  <!--<script src="libxcorr.min.js"></script>-->
+  <script>
+    function audioBufferLoader(context, url, onLoadFn, onErrorFn) {
+      let onLoadCallback = onLoadFn || function(buffer){};
+      let onErrorCallback = onErrorFn || function(){};
+      let request;
+      if (url instanceof Blob) { request = new FileReader(); } 
+      else {
+        request = new XMLHttpRequest();
+        request.open('GET', url, true);
+        request.responseType = 'arraybuffer';
+      }
+      request.onload = function() {  // success
+        context.decodeAudioData(request.response, onLoadCallback, onErrorCallback)
+      }
+      request.send();
+    }
+
+    let spec;
+    function load_it() {
+      let context = new AudioContext();
+      audioBufferLoader(context, '7100668.mp3', (buffer) => {
+        spec = new SpectrogramPlayer(context, (spec, context) => {
+          let src = context.createBufferSource();
+          src.buffer = buffer;
+          return src;
+        }, document.getElementById("spectrogram"), {waveform:true});
+      });
+    }
+    window.addEventListener("load", load_it);
+  </script>
+
+<style>
+  body { margin: 0; }
+  .spectrogram, table { width: 100%; max-width: 500px; margin: 0 auto; }
+  .spectrogram canvas { display: block; border: 1px solid black; background-color: black; }
+  .spectrogram canvas + canvas { background-color: white; }
+  .spectrogram .controls { width: 100%; border: 1px solid black; background-color: #c4c4c4; text-align: center; padding: 0.5em 0; }
+  .spectrogram .controls .button:first-child { margin-left: 0; }
+  .spectrogram .controls .button { margin-left: 1em; display: inline-block; font-size: 2em; line-height: 0.75em; cursor: pointer; user-select: none; }
+  sup { font-size: 0.75em; display: inline-block; max-height: 0.5em; width: 0; vertical-align: 0.45em; }
+  sub { font-size: 0.6em; vertical-align: -0.35em; }
+  td { vertical-align: middle; text-align: center; white-space: nowrap; padding: 0 0.3em; }
+  td:first-child { padding-left: 0; text-align: left; }
+  td:last-child { padding-right: 0; text-align: left; }
+  input { width: 100%; }
+</style>
+
+<div id="spectrogram" class="spectrogram"></div>
+
+</body>
+</html>

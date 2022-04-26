@@ -4,6 +4,7 @@ table { border-collapse: collapse; }
 td { vertical-align: middle; text-align: center; white-space: nowrap; padding: 0 0.3em; }
 input { width: 100%; margin: 0; }
 input[type=range] { height: 4em; display: block; }
+a { color: #00cc00; }
 
 #container { max-width: 1000px; width: 100%; margin: 0 auto; }
 

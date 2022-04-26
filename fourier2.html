@@ -13,7 +13,11 @@
 
 <body>
 <script src="utils.js"></script>
+<script src="pulsefft.js"></script>
 <script>
+  let pulse = null;
+  loadPulse().then((p) => { pulse = p; })
+
   let context, audio_buffer;
 
   /**
@@ -23,16 +27,22 @@
     context = new AudioContext();
     audioBufferLoader(context, document.getElementById('sample').value, (buffer) => {
       audio_buffer = buffer;
-      let one_sec = 8820;  // target samples per second
-      let data = average_down(buffer.getChannelData(0), Math.round(buffer.sampleRate / one_sec));
+
+      const one_sec = 8820;  // target samples per second (just to make processing faster)
+      let data = average_down(buffer.getChannelData(0), buffer.sampleRate / one_sec);
       let w = wave2_context.canvas.width;
       drawWaveform(wave_context, data, buffer.duration);
       drawWaveform(wave2_context, data.subarray(one_sec*0.98, one_sec*1.02), 0.1, 0.1,
         [0, 0.5*w, 1*w], ['0.98 sec', '1 sec', '1.02 sec']);
+
+      data = average_down(buffer.getChannelData(0), buffer.sampleRate / 4200);
       drawFourier(fourier_context, data, buffer.duration, 2100);
     });
   }
 
+  /**
+   * Play the current audio file.
+   */
   function play() {
     let audio = context.createBufferSource();
     audio.buffer = audio_buffer;

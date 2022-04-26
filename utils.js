@@ -22,7 +22,7 @@ function audioBufferLoader(context, url, onLoadFn, onErrorFn) {
  * the given number of data points (n).
  */
 function computeCosines(n, secs, freqs, amps) {
-  let array = new Float64Array(n);
+  let array = new Float32Array(n);
   const factor = 2*Math.PI*secs/n;
   const amp_factor = 1/amps.reduce((p, c) => p + c, 0);
   for (let i = 0; i < freqs.length; i++) {
@@ -46,17 +46,18 @@ function clearCanvas(context, style) {
 /**
  * Clear a curve on the canvas.
  */
-function drawCurve(context, data, stride, scale) {
+function drawCurve(context, data, stride, scale, x_inc) {
+  const width = context.canvas.width, height = context.canvas.height;
+
   if (typeof stride === "undefined") { stride = 1; }
   if (typeof scale === "undefined") { scale = 1; }
+  if (!x_inc) { x_inc = stride / data.length * width; }
   if (scale === 'auto') {
     let max = data.reduce((prev, x) => (prev > x) ? prev : x, 0);
     let min = data.reduce((prev, x) => (prev < x) ? prev : x, 0);
     scale = 0.95/Math.max(max, Math.abs(min));
   }
 
-  const width = context.canvas.width, height = context.canvas.height;
-  const x_inc = stride / data.length * width;
   context.beginPath();
   for (let i = 0, x = 0; i < data.length; x+=x_inc, i += stride) {
     let val = data[Math.round(i)];
@@ -102,10 +103,11 @@ function drawGrid(context, indices, labels) {
  * marks. Some of the data will be skipped to fit onto the canvas.
  */
 function drawWaveform(context, data, secs, total_seconds, indices, labels) {
-  if (typeof total_seconds === "undefined") { total_seconds = secs; }
+  let provided_total_seconds = (typeof total_seconds !== "undefined") && secs !== total_seconds;
+  if (!provided_total_seconds) { total_seconds = secs; }
 
   const width = context.canvas.width, height = context.canvas.height;
-  const stride = Math.min(data.length/width*total_seconds/secs, 1);
+  const stride = provided_total_seconds ? data.length/width*total_seconds/secs : 1;
 
   // draw the grid
   clearCanvas(context);
@@ -121,7 +123,7 @@ function drawWaveform(context, data, secs, total_seconds, indices, labels) {
   // draw the wave
   context.strokeStyle = 'lime';
   context.lineWidth = 2;
-  drawCurve(context, data, stride, 'auto');
+  drawCurve(context, data, stride, 'auto', provided_total_seconds ? 1 : 0);
 }
 
 /**
@@ -185,37 +187,41 @@ function drawWinding(context, data, cycles, amp_scale) {
 }
 
 function drawFourier(context, data, seconds, max_freq) {
-  const n = data.length, n2 = context.canvas.width /*Math.floor(n/2)*/;
+  const width = context.canvas.width, height = context.canvas.height, n = data.length;
   max_freq = (typeof max_freq === "undefined") ? seconds : max_freq; // TODO: default isn't right...
-  const resolution = max_freq / n2;
-  const freq_factor = 2*Math.PI*seconds*resolution/n;
-  let reals = new Float64Array(n2 + 1);
-  let imags = new Float64Array(n2 + 1);
-  let mags = new Float64Array(n2 + 1);
-  // let phases = new Float64Array(n2 + 1);
+
+  let reals, imags;
+  if (pulse !== null) {
+    // use PulseFFT if available
+    // TODO: results in a bunch of nans, if I do it outside this function is seems to work...
+    //data = extract(data, data.length/(max_freq*seconds*2)); // to match the spacing we need to pre-decimate the signal to match the max frequency
+    [reals, imags] = fft(data);
+  } else {
+    [reals, imags] = fft_basic(data, seconds*max_freq, width);
+  }
+  reals[0] = 0;
+  imags[0] = 0;
+  //for (let j = 0; j < reals.length; j++) { reals[j] /= n; imags[j] /= n; }
+
+  let mags = new Float32Array(reals.length);
+  // let phases = new Float32Array(reals.length);
   let max = 0;
-  for (let j = 0; j <= n2; j++) {
-    let x_sum = 0, y_sum = 0;
-    const f = j * freq_factor;
-    for (let i = 0; i < n; i++) {
-      x_sum += data[i]*Math.cos(i*f);
-      y_sum -= data[i]*Math.sin(i*f);
-    }
-    reals[j] = x_sum / n;
-    imags[j] = y_sum / n;
+  for (let j = 0; j < reals.length; j++) {
     mags[j] = Math.sqrt(reals[j] * reals[j] + imags[j] * imags[j]);
     // phases[j] = Math.atan2(imags[j], reals[j]);
     if (mags[j] > max) { max = mags[j]; }
   }
   max *= 1.05;
 
-  const width = context.canvas.width, height = context.canvas.height, stride = reals.length/width;
+
+  // do the actual drawing
+
   clearCanvas(context);
 
   let indices = [], labels = [];
   if (max_freq > 1000) {
     // for (let i = 0; i <= max_freq; i += 500) {
-    //  indices.push(Math.round(i/resolution*width/(n2+1)));
+    //  indices.push(Math.round(i*width/max_freq));
     //  labels.push((i/1000).toFixed(1) + " kHz");
     // }
     // freqs = [32.70320, 55, 82.40689, 110,
@@ -240,27 +246,27 @@ function drawFourier(context, data, seconds, max_freq) {
               'C', 'D', 'E', 'F', 'G', 'A', 'B♭', 'B',  // 5
               'C', 'C♯', 'D', 'E♭', 'E', 'F', 'F♯', 'G', 'A♭', 'A', 'B♭', 'B',  // 6
               'C'];  // 7
-    indices = freqs.map((x) => Math.round(x/resolution*width/(n2+1)));
-    let mid_c = 261.6256/resolution*width/(n2+1);
+    indices = freqs.map((x) => Math.round(x*width/max_freq));
+    let mid_c = 261.6256*width/max_freq;
     context.fillStyle = '#440000';
     context.fillRect(mid_c-15, height-15, 15, 15);
   } else {
     for (let i = 0; i <= max_freq; i++) {
-      indices.push(Math.round(i/resolution*width/(n2+1)));
+      indices.push(Math.round(i*width/max_freq));
       labels.push(i + " Hz");
     }
   }
   drawGrid(context, indices, labels);
   
   context.lineWidth = 2;
-  context.strokeStyle = '#FF8888';
-  drawCurve(context, reals, stride, 1/max);
+  context.strokeStyle = '#FF8888';1
+  drawCurve(context, reals, 1, 1/max);
   context.strokeStyle = '#8888FF';
-  drawCurve(context, imags, stride, 1/max);
+  drawCurve(context, imags, 1, 1/max);
   context.strokeStyle = 'white';
-  drawCurve(context, mags, stride, 1/max);
+  drawCurve(context, mags, 1, 1/max);
   // context.strokeStyle = 'gray';
-  // drawCurve(context, phases, stride, 1/(2*Math.PI));
+  // drawCurve(context, phases, 1, 1/(2*Math.PI));
 }
 
 /**
@@ -315,9 +321,9 @@ function adjustVolumes(event, base_name, num_waves) {
  * Decimates a data array by taking only every few elements from the array.
  */
 function extract(data, step) {
-  let out = new Float32Array(Math.floor(data.length / step));
+  let out = new Float32Array(Math.ceil(data.length / step));
   for (let i = 0, j = 0; i < data.length; i+=step, j++) {
-    out[j] = data[i];
+    out[j] = data[Math.round(i)];
   }
   return out;
 }
@@ -329,8 +335,39 @@ function extract(data, step) {
   let out = new Float32Array(Math.floor(data.length / step));
   for (let i = 0, j = 0; i < data.length; i+=step, j++) {
     let val = 0;
-    for (let j = i; j < i + step; j++) { val += data[j]; }
+    for (let j = Math.round(i); j < i + step; j++) { val += data[j]; }
     out[j] = val / step;
   }
   return out;
+}
+
+function fft(data) {
+  if (data.length % 2) {
+    let padded = new Float32Array(data.length + 1);
+    padded.set(data);
+    padded[data.length] = 0;
+    data = padded;
+  }
+  let fft = new pulse.fftReal(data.length);
+  let fft_data = fft.forward(data);
+  let real = extract(fft_data, 2);
+  let imag = extract(fft_data.subarray(1), 2);
+  return [real, imag];
+}
+
+function fft_basic(data, total_time, num_out) {
+  const n = data.length, freq_factor = 2*Math.PI*total_time/(n*num_out);
+  reals = new Float32Array(num_out);
+  imags = new Float32Array(num_out);
+  for (let j = 0; j < num_out; j++) {
+    let x_sum = 0, y_sum = 0;
+    const f = j * freq_factor;
+    for (let i = 0; i < n; i++) {
+      x_sum += data[i]*Math.cos(i*f);
+      y_sum -= data[i]*Math.sin(i*f);
+    }
+    reals[j] = x_sum;
+    imags[j] = y_sum;
+  }
+  return [reals, imags];
 }

@@ -1,0 +1,95 @@
+<!doctype html>
+
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fourier Transform</title>
+  <meta name="author" content="Jeffrey Bush">
+  <link rel="icon" href="favicon.png" type="image/png">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+<script src="utils.js"></script>
+<script>
+  let context, audio_buffer;
+
+  /**
+   * Updates all of the textual and graphical displays whenever the sample changes.
+   */
+  function update() {
+    context = new AudioContext();
+    audioBufferLoader(context, document.getElementById('sample').value, (buffer) => {
+      audio_buffer = buffer;
+      let one_sec = 8820;  // target samples per second
+      let data = average_down(buffer.getChannelData(0), Math.round(buffer.sampleRate / one_sec));
+      let w = wave2_context.canvas.width;
+      drawWaveform(wave_context, data, buffer.duration);
+      drawWaveform(wave2_context, data.subarray(one_sec*0.98, one_sec*1.02), 0.1, 0.1,
+        [0, 0.5*w, 1*w], ['0.98 sec', '1 sec', '1.02 sec']);
+      drawFourier(fourier_context, data, buffer.duration, 2100);
+    });
+  }
+
+  function play() {
+    let audio = context.createBufferSource();
+    audio.buffer = audio_buffer;
+    audio.connect(context.destination);
+    audio.start(0);
+  }
+
+  function resize() {
+    const w = Math.min(document.body.clientWidth, 1000);
+    //const h = document.body.clientHeight;
+
+    let wave = document.getElementById("wave");
+    wave.width = w*.35;
+    wave.height = w/500*80;
+
+    let wave2 = document.getElementById("wave2");
+    wave2.width = w*.6;
+    wave2.height = w/500*80;
+    
+    let winding = document.getElementById("fourier");
+    winding.width = w;
+    winding.height = w/500*80;
+
+    update();
+  }
+
+  let wave_context, wave2_context, fourier_context;
+  function load() {
+    wave_context = document.getElementById("wave").getContext("2d");
+    wave2_context = document.getElementById("wave2").getContext("2d");
+    fourier_context = document.getElementById("fourier").getContext("2d");
+    resize();
+  }
+  window.addEventListener("load", load);
+  window.addEventListener("resize", resize);
+</script>
+
+<div id="container" class="fourier2">
+<div id="complete-label">Complete Wave</div><div id="zoomed-label">Zoomed</div>
+<canvas id="wave"></canvas><canvas id="wave2"></canvas>
+<canvas id="fourier"></canvas>
+<table><tr>
+  <td>Sample:</td><td><select id="sample" oninput="update();">
+    <option value="Flute.nonvib.ff.A4.stereo.mp3">A</option>
+    <option value="Flute.nonvib.ff.C4.stereo.mp3">B</option>
+    <option value="Flute.nonvib.ff.C5.stereo.mp3">C</option>
+    <option value="Flute.nonvib.ff.D5.stereo.mp3">D</option>
+    <option value="Flute.nonvib.ff.G5.stereo.mp3">E</option>
+    <option value="Flute.vib.ff.A4.stereo.mp3">F</option>
+    <option value="Flute.vib.ff.C4.stereo.mp3">G</option>
+    <option value="Flute.vib.ff.C5.stereo.mp3">H</option>
+    <option value="Flute.vib.ff.D5.stereo.mp3">I</option>
+    <option value="Flute.vib.ff.G5.stereo.mp3">J</option>
+  </select>
+  </td>
+  <td><span id="play" onclick="play()">Play ▶</span></td>
+</tr></table>
+</div>
+</body>
+</html>

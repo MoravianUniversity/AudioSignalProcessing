@@ -1,0 +1,128 @@
+<!doctype html>
+
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Winding Waves</title>
+  <meta name="author" content="Jeffrey Bush">
+  <link rel="icon" href="/favicon.png" type="image/png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+<script src="utils.js"></script>
+<script>
+  /**
+   * Draw the plots and animate them.
+   */
+  function draw() {
+    requestAnimationFrame(draw);
+    const animation_speed = +document.getElementById("animation-select").value;
+
+    let complete = true;
+    let datapoints = total_datapoints, seconds = total_seconds, progress;
+    if (animation_speed !== 1) {
+      animation_time += animation_speed/100;
+      if (animation_time > total_seconds) {
+        animation_time = total_seconds;
+      } else {
+        progress = animation_time/total_seconds;
+        datapoints *= progress;
+        seconds = animation_time;
+        complete = false;
+      }
+    }
+    
+    // draw the winding diagram and the waves
+    const winding = +document.getElementById("winding-select").value;
+    const freqs = [+document.getElementById("freq-select-0").value];
+    let data = computeCosines(datapoints, seconds, freqs, [1]);
+    drawWinding(winding_context, data, datapoints/(seconds*winding));
+    drawWaveform(wave_context, data, seconds, total_seconds);
+
+    if (!complete) {
+      // draw arrows for current data point
+      const val = data[data.length-1];
+      const angle = 2*Math.PI*animation_time*winding;
+
+      let width = winding_context.canvas.width, height = winding_context.canvas.height;
+      const mid = Math.min(width, height)/2;
+      winding_context.strokeStyle = 'blue';
+      winding_context.fillStyle = 'blue';
+      drawArrow(winding_context, mid, mid, (1+val*Math.cos(angle))*mid, 
+                                           (1-val*Math.sin(angle))*mid);
+
+      width = wave_context.canvas.width, height = wave_context.canvas.height;
+      wave_context.strokeStyle = 'blue';
+      wave_context.fillStyle = 'blue';
+      drawArrow(wave_context, progress*width, height/2, progress*width, (1-val)*height/2);
+    }
+  }
+
+  /**
+   * Updates all of the textual and graphical displays whenever any of the
+   * sliders change.
+   */
+  function update() {
+    const freq = +document.getElementById("freq-select-0").value;
+    const freq_text = freq.toFixed(1);
+    document.getElementById("freq-0").innerText = freq_text + ' Hz';
+
+    const winding = +document.getElementById("winding-select").value;
+    document.getElementById("winding-freq").innerText = winding.toFixed(2) + ' Hz';
+
+    // animation resets
+    animation_time = 0;
+  }
+
+  function resize() {
+    const w = Math.min(document.body.clientWidth, 1000);
+    //const h = document.body.clientHeight;
+    
+    let winding = document.getElementById("winding");
+    winding.height = winding.width = w*0.35;
+
+    let wave = document.getElementById("wave");
+    wave.width = w*0.65;
+    wave.height = (w*0.65/500)*120;
+  }
+
+  let wave_context, winding_context;
+  let animation_time = 0, total_seconds = 5, total_datapoints = 5000;
+
+  function load() {
+    winding_context = document.getElementById("winding").getContext("2d");
+    wave_context = document.getElementById("wave").getContext("2d");
+    resize();
+    update();
+    draw();
+  }
+  window.addEventListener("load", load);
+  window.addEventListener("resize", resize);
+</script>
+
+<div id="container" class="winding">
+<canvas id="winding"></canvas>
+<canvas id="wave"></canvas>
+<table id="wave-design">
+  <tr>
+    <td>Winding Freq</td>
+    <td id="winding-freq"></td>
+    <td><input id="winding-select" type="range" min="0.1" max="5" step="0.05" value="1" oninput="update()"></td>
+  </tr>
+  <tr>
+    <td >Signal Frequency</td>
+    <td id="freq-0"></td>
+    <td><input id="freq-select-0" type="range" min="0.1" max="5" step="0.1" value="2.5" oninput="update()"></td>
+  </tr>
+  <tr>
+    <td>Animation Speed</td>
+    <td id="animation-speed"></td>
+    <td><input id="animation-select" type="range" min="0" max="1" step="0.05" value="0.05"></td>
+  </tr>
+</table>
+</div>
+</body>
+</html>

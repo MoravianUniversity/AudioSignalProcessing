@@ -1,0 +1,99 @@
+<!doctype html>
+
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Winding Two Waves</title>
+  <meta name="author" content="Jeffrey Bush">
+  <link rel="icon" href="/favicon.png" type="image/png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+<script src="utils.js"></script>
+<script>
+  /**
+   * Updates all of the textual and graphical displays whenever any of the
+   * sliders change.
+   */
+  function update(e) {
+    // make sure amplitudes sum to 100
+    adjustVolumes(e, "volume-select-", num_waves);
+
+    // get all of the frequencies and amplitudes (update their texts as well)
+    let freqs = [], amps = [];
+    for (let i = 0; i < num_waves; i++) {
+      const freq = +document.getElementById("freq-select-"+i).value;
+      const freq_text = freq.toFixed(1);
+      document.getElementById("freq-"+i).innerText = freq_text + ' Hz';
+      freqs.push(freq);
+
+      const volume = +document.getElementById("volume-select-"+i).value;
+      document.getElementById("volume-"+i).innerText = volume + '%';
+      amps.push(volume/100);
+    }
+
+    const winding = +document.getElementById("winding-select").value;
+    document.getElementById("winding-freq").innerText = winding.toFixed(2) + ' Hz';
+
+    let datapoints = total_datapoints, seconds = total_seconds;
+    let data = computeCosines(datapoints, seconds, freqs, amps);
+    drawWinding(winding_context, data, datapoints/(seconds*winding));
+    drawWaveform(wave_context, data, seconds);
+  }
+
+  function resize() {
+    const w = Math.min(document.body.clientWidth, 1000);
+    //const h = document.body.clientHeight;
+    
+    let winding = document.getElementById("winding");
+    winding.height = winding.width = w*0.35;
+
+    let wave = document.getElementById("wave");
+    wave.width = w*0.65;
+    wave.height = (w*0.65/500)*120;
+
+    update();
+  }
+
+  let wave_context, winding_context;
+  let total_seconds = 5, total_datapoints = 5000;
+  let num_waves = 2, default_freqs = [2.5, 0.6], default_volumes = [60, 40];
+
+  function load() {
+    winding_context = document.getElementById("winding").getContext("2d");
+    wave_context = document.getElementById("wave").getContext("2d");
+
+    let table = document.getElementById("wave-design");
+    for (let i = 0; i < num_waves; i++) {
+      table.insertRow().innerHTML = `
+<td>Frequency #${i+1}</td><td id="freq-${i}"></td>
+<td><input id="freq-select-${i}" type="range" min="0.1" max="5" step="0.1" value="${default_freqs[i]}"></td>`;
+      table.insertRow().innerHTML = `
+<td>Amplitude #${i+1}</td><td id="volume-${i}"></td>
+<td><input id="volume-select-${i}" type="range" min="0" max="100" value="${default_volumes[i]}"></td>`;
+      document.getElementById("freq-select-"+i).addEventListener("input", update);
+      document.getElementById("volume-select-"+i).addEventListener("input", update);
+    }
+
+    resize();
+  }
+  window.addEventListener("load", load);
+  window.addEventListener("resize", resize);
+</script>
+
+<div id="container" class="winding">
+<canvas id="winding"></canvas>
+<canvas id="wave"></canvas>
+<table id="wave-design">
+  <tr>
+    <td>Winding Freq</td>
+    <td id="winding-freq"></td>
+    <td><input id="winding-select" type="range" min="0.1" max="5" step="0.05" value="1" oninput="update()"></td>
+  </tr>
+</table>
+</div>
+</body>
+</html>

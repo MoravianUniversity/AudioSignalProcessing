@@ -18,3 +18,18 @@ input[type=range] { height: 4em; display: block; }
 #container.fourier table { width: 100%; }
 #container.fourier table td { width: auto; text-align: right; }
 #container.fourier table td + td + td { width: 100%; }
+
+#container.fourier2 #complete-label { float: left; width: 35%; text-align: center; font-weight: bold; padding: 5px; }
+#container.fourier2 #zoomed-label { float: right; width: 60%; text-align: center; font-weight: bold; padding: 5px; }
+#container.fourier2 #wave { float: left; /*width: 35%;*/ padding-bottom: 15px; }
+#container.fourier2 #wave2 { float: right; /*width: 65%;*/ }
+#container.fourier2 table { margin: 0 auto; margin-top: 1.5em; }
+select { padding: 0.5em; }
+#play {
+    background: #555555; border-radius: 10px; padding: 0.5em; cursor: pointer; user-select: none;
+    text-shadow:
+  -1px -1px 0 #000,
+   1px -1px 0 #000,
+   -1px 1px 0 #000,
+    1px 1px 0 #000;
+}

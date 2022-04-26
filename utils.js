@@ -3,6 +3,19 @@
  * Author: Jeffrey Bush
  */
 
+
+function audioBufferLoader(context, url, onLoadFn, onErrorFn) {
+  let onLoadCallback = onLoadFn || function(buffer){};
+  let onErrorCallback = onErrorFn || function(){};
+  let request = new XMLHttpRequest();
+  request.open('GET', url, true);
+  request.responseType = 'arraybuffer';
+  request.onload = function() {
+    context.decodeAudioData(request.response, onLoadCallback, onErrorCallback)
+  }
+  request.send();
+}
+
 /**
  * Compute the sum of cosines of the given frequencies and amplitudes. The
  * computation is done over the given number of seconds and evaluated at
@@ -36,11 +49,18 @@ function clearCanvas(context, style) {
 function drawCurve(context, data, stride, scale) {
   if (typeof stride === "undefined") { stride = 1; }
   if (typeof scale === "undefined") { scale = 1; }
+  if (scale === 'auto') {
+    let max = data.reduce((prev, x) => (prev > x) ? prev : x, 0);
+    let min = data.reduce((prev, x) => (prev < x) ? prev : x, 0);
+    scale = 0.95/Math.max(max, Math.abs(min));
+  }
 
-  const height = context.canvas.height;
+  const width = context.canvas.width, height = context.canvas.height;
+  const x_inc = stride / data.length * width;
   context.beginPath();
-  for (let i = 0, x = 0; i < data.length; x++, i += stride) {
-    let y = (1 - data[Math.round(i)] * scale) * height/2
+  for (let i = 0, x = 0; i < data.length; x+=x_inc, i += stride) {
+    let val = data[Math.round(i)];
+    let y = (1 - val * scale) * height/2
     if (i === 0) { context.moveTo(x, y); }
     else { context.lineTo(x, y); }
   }
@@ -66,7 +86,8 @@ function drawGrid(context, indices, labels) {
     context.stroke();
     if (labels && labels[i]) {
       const text = labels[i], metrics = context.measureText(text);
-      context.fillText(text, x - metrics.width - 4, height - 3);
+      x = x - metrics.width < 0 - 4 ? x + 4 : x - metrics.width - 4;
+      context.fillText(text, x, height - 3);
     }
   }
   context.beginPath();
@@ -80,25 +101,27 @@ function drawGrid(context, indices, labels) {
  * Draws the data along with putting dashed lines at each of the second
  * marks. Some of the data will be skipped to fit onto the canvas.
  */
-function drawWaveform(context, data, secs, total_seconds) {
+function drawWaveform(context, data, secs, total_seconds, indices, labels) {
   if (typeof total_seconds === "undefined") { total_seconds = secs; }
 
   const width = context.canvas.width, height = context.canvas.height;
-  const stride = data.length/width*total_seconds/secs;
+  const stride = Math.min(data.length/width*total_seconds/secs, 1);
 
   // draw the grid
   clearCanvas(context);
-  let indices = [], labels = [];
-  for (let i = 1; i < total_seconds; i++) {
-    indices.push(Math.round(i*width/total_seconds));
-    labels.push(i + " sec");
+  if (typeof indices === "undefined") {
+    indices = [], labels = [];
+    for (let i = 0; i <= total_seconds; i++) {
+      indices.push(Math.round(i*width/total_seconds));
+      labels.push(i + " sec");
+    }
   }
   drawGrid(context, indices, labels);
 
   // draw the wave
   context.strokeStyle = 'lime';
   context.lineWidth = 2;
-  drawCurve(context, data, stride);
+  drawCurve(context, data, stride, 'auto');
 }
 
 /**
@@ -161,8 +184,10 @@ function drawWinding(context, data, cycles, amp_scale) {
   context.fillText(text, min - metrics.width - 4, min - 4);
 }
 
-function drawFourier(context, data, seconds) {
-  const n = data.length, n2 = context.canvas.width /*Math.floor(n/2)*/, resolution = seconds / n2;
+function drawFourier(context, data, seconds, max_freq) {
+  const n = data.length, n2 = context.canvas.width /*Math.floor(n/2)*/;
+  max_freq = (typeof max_freq === "undefined") ? seconds : max_freq; // TODO: default isn't right...
+  const resolution = max_freq / n2;
   const freq_factor = 2*Math.PI*seconds*resolution/n;
   let reals = new Float64Array(n2 + 1);
   let imags = new Float64Array(n2 + 1);
@@ -182,14 +207,48 @@ function drawFourier(context, data, seconds) {
     // phases[j] = Math.atan2(imags[j], reals[j]);
     if (mags[j] > max) { max = mags[j]; }
   }
+  max *= 1.05;
 
-  const width = context.canvas.width, stride = reals.length/width;
+  const width = context.canvas.width, height = context.canvas.height, stride = reals.length/width;
   clearCanvas(context);
 
   let indices = [], labels = [];
-  for (let i = 1; i < n2*resolution; i++) {
-    indices.push(Math.round(i/resolution*width/(n2+1)));
-    labels.push(i + " Hz");
+  if (max_freq > 1000) {
+    // for (let i = 0; i <= max_freq; i += 500) {
+    //  indices.push(Math.round(i/resolution*width/(n2+1)));
+    //  labels.push((i/1000).toFixed(1) + " kHz");
+    // }
+    // freqs = [32.70320, 55, 82.40689, 110,
+    //          130.8128, 164.8138, 195.9977, 220, //246.9417,
+    //          261.6256, 293.6648, 311.1270, 329.6276, 349.2282, 369.9944, 391.9954, 415.3047, 440, 466.1638, 493.8833,
+    //          523.2511, 554.3653, 587.3295, 622.2540, 659.2551, 698.4565, 739.9888, 783.9909, 830.6094, 880, 932.3275, 987.7666,
+    //          1046.502, 1318.510, 1760];
+    // labels = ['C₁', 'A₁', 'E₂', 'A₂',
+    //           'C₃', 'E₃', 'G₃', 'A₃', //'B₃',
+    //           'C₄', 'D₄', '', 'E₄', 'F₄', '', 'G₄', 'A♭₄', 'A₄', 'B♭₄', 'B₄',
+    //           'C₅', 'C♯₅', 'D₅', 'E♭₅', 'E₅', 'F₅', 'F♯₅', 'G₅', 'A♭₅', 'A₅', 'B♭₅', 'B₅',
+    //           'C₆', 'E₆', 'A₆'];
+    freqs = [55, 110,
+             164.8138, 220,
+             261.6256, 329.6276, 391.9954, 440,
+             523.2511, 587.3295, 659.2551, 698.4565, 783.9909, 880, 932.3275, 987.7666,
+             1046.502, 1108.731, 1174.659, 1244.508, 1318.510, 1396.913, 1479.978, 1567.982, 1661.219, 1760, 1864.655, 1975.533,
+             2093.005];
+    labels = ['A', 'A',  // 1, 2
+              'E', 'A',  // 3
+              'C', 'E', 'G', 'A',  // 4
+              'C', 'D', 'E', 'F', 'G', 'A', 'B♭', 'B',  // 5
+              'C', 'C♯', 'D', 'E♭', 'E', 'F', 'F♯', 'G', 'A♭', 'A', 'B♭', 'B',  // 6
+              'C'];  // 7
+    indices = freqs.map((x) => Math.round(x/resolution*width/(n2+1)));
+    let mid_c = 261.6256/resolution*width/(n2+1);
+    context.fillStyle = '#440000';
+    context.fillRect(mid_c-15, height-15, 15, 15);
+  } else {
+    for (let i = 0; i <= max_freq; i++) {
+      indices.push(Math.round(i/resolution*width/(n2+1)));
+      labels.push(i + " Hz");
+    }
   }
   drawGrid(context, indices, labels);
   
@@ -241,7 +300,7 @@ function drawArrow(context, x0, y0, x1, y1) {
  */
 function adjustVolumes(event, base_name, num_waves) {
   if (!event || !event.target.id.startsWith(base_name)) { return; }
-  let elems = []
+  let elems = [];
   for (let i = 0; i < num_waves; i++) {
     elems.push(document.getElementById(base_name+i));
   }
@@ -250,4 +309,28 @@ function adjustVolumes(event, base_name, num_waves) {
   for (let i = 0; i < num_waves; i++) { if (i !== idx) { sum += +elems[i].value; } }
   let factor = (100 - val) / sum;
   for (let i = 0; i < num_waves; i++) { if (i !== idx) { elems[i].value *= factor; } }
+}
+
+/**
+ * Decimates a data array by taking only every few elements from the array.
+ */
+function extract(data, step) {
+  let out = new Float32Array(Math.floor(data.length / step));
+  for (let i = 0, j = 0; i < data.length; i+=step, j++) {
+    out[j] = data[i];
+  }
+  return out;
+}
+
+/**
+ * Decimates a data array by averaging only every few elements from the array.
+ */
+ function average_down(data, step) {
+  let out = new Float32Array(Math.floor(data.length / step));
+  for (let i = 0, j = 0; i < data.length; i+=step, j++) {
+    let val = 0;
+    for (let j = i; j < i + step; j++) { val += data[j]; }
+    out[j] = val / step;
+  }
+  return out;
 }

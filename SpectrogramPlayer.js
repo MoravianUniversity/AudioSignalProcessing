@@ -104,7 +104,7 @@ function SpectrogramPlayer(audio_context, source_gen, element, options) {
       sn.connect(gn);
       gn.connect(splitterNode);
       if (!is_microphone) { gn.connect(audio_context.destination); }
-      sn.start(0, offset);
+      if (sn.start) { sn.start(0, offset); }
     }
     if (post_setup !== null) { post_setup(this); }
 

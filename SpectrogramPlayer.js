@@ -1,34 +1,115 @@
-function drawWaveform(canvas_context, data, n) {
-  if (typeof n === "undefined") { n = data.length; }
-  const width = canvas_context.canvas.width, height = canvas_context.canvas.height;
-  canvas_context.fillStyle = 'rgb(255, 255, 255)';  // 200?
-  canvas_context.fillRect(0, 0, width, height);
-  canvas_context.lineWidth = 1.5;
-  canvas_context.strokeStyle = 'rgba(0, 0, 0, 0.75)';
-  canvas_context.beginPath();
-  const sliceWidth = width / n;
-  if (n !== data.length) {
-    let start = Math.floor((data.length - n) / 2);
-    // if (typeof canvas_context._last_data !== "undefined") {
-      // xcorr.timeLag(canvas_context._last_data, data).then((offset) => {
-      //   console.log(offset);
-      // });
-      // offset = xcorr(canvas_context._last_data, data);  // TODO: perform a cross corelation with the last signal to get the best alignment
-      // start = offset - Math.floor(n/2);
-    // }
-    canvas_context._last_data = data.slice();
-    data = data.subarray(start, start+n);
+/**
+ * Draws the waveform from the data onto the canvas context. Only the "central"
+ * n values from the data are drawn. The center is determined so to align each
+ * drawing with the previous drawing. This can only be used once for each
+ * canvas. The alignment mostly works but not entirely perfect. Alignment uses
+ * the xcorr library.
+ */
+function drawAlignedWaveform(context, data, n) {
+  const len = data.length;
+  data = new Float32Array(data);
+  for (let i = 0; i < len; i++) { data[i] = data[i]/128 - 1; }
+  if (typeof n === "undefined") { n = len; }
+  else if (n !== len) {
+    if (typeof context._last_data !== "undefined") {
+      xcorr.correlate(context._last_data, data).then((buffer) => {
+        const buf_len = buffer.length, buf_len_2 = 0.5*buf_len;
+        let max_left_i = 0, max_left = buffer[0];
+        let max_right_i = buf_len-1, max_right = buffer[max_right_i];
+        for (let i = 1; i <= buf_len_2; i++) {
+          let left = buffer[i];
+          if (left > max_left) { max_left_i = i; max_left = left; }
+          let right = buffer[buf_len-i-1];
+          if (right > max_right) { max_right_i = buf_len-i-1; max_right = right; }
+        }
+        let left = (Math.abs(max_left - max_right) < 0.01) ? Math.random()>=0.5 : max_left > max_right;
+        let max_i = left ? max_left_i : max_right_i;
+
+        // make sure we aren't getting too close to either end of the data
+        // TODO: this isn't quite right and slowly moves to the left
+        // probably need to adjust the 0.5's below, just not sure how or why
+        const half_n = 0.5*n;
+        let mid = context._last_middle - max_i + len - (left ? -0.5 : 0.5);
+        if (mid > len - half_n) {
+          mid = context._last_middle - max_right_i + len - 0.5;
+        } else if (mid < half_n) {
+          mid = context._last_middle - max_left_i + len + 0.5;
+        }
+
+        // save
+        context._last_middle = mid;
+        context._last_data = data;
+
+        // draw
+        const start = Math.floor(mid-half_n);
+        _drawWaveform(context, data.subarray(start, start+n));
+      });
+    } else {
+      // assume middle
+      context._last_data = data;
+      let mid = context._last_middle = len/2;
+      const start = Math.floor(mid-0.5*n);
+      _drawWaveform(context, data.subarray(start, start+n));
+    }
+  } else {
+    _drawWaveform(context, data);
   }
-  let x = 0;
-  for (let i = 0; i < n; i++) {
-    let y = data[i] / 128.0 * height/2;
-    if (i === 0) { canvas_context.moveTo(x, y); }
-    else { canvas_context.lineTo(x, y); }
-    x += sliceWidth;
-  }
-  canvas_context.stroke();
 }
 
+/**
+ * Internal function for drawAlignedWaveform() that does the actual drawing
+ * once the data has been cropped to the aligned sequence.
+ */
+function _drawWaveform(context, data) {
+  clearCanvas(context);
+  context.strokeStyle = 'lime';
+  context.lineWidth = 1.5;
+  plot(context, data);
+}
+
+/**
+ * Spectrogram display with player controls. The audio context is the context
+ * to which results will be sent (and used to create nodes). source_gen is a
+ * function that takes a reference to this spectrogram player and the audio
+ * context (although the audio context is obtainable through the audio_context
+ * attribute). The function returns a single or an array of source nodes. Each
+ * source node is hooked up to a gain node automatically. The element is the
+ * parent element of the player. The options are used to set various options of
+ * the player:
+ *   - width: the width (in px) of the player, defaults to the element's width
+ *   - height: the height (in px) of the player, defaults to 250px
+ *   - rewind: include a rewind button, defaults to true
+ *   - autoplay: if auto-playing should be attempted, defaults to false, may
+ *     not work if true due to browser restrictions
+ *   - waveform: display the waveform of the current audio, defaults to false
+ *   - microphone: support microphones, doesn't play audio out and forces
+ *     rewind to false
+ *   - post_setup: function to call once audio is ready to be played, takes
+ *     a reference to this player, useful for adjusting the gain nodes
+ * 
+ * Attributes:
+ *   - audio_context
+ *   - gain_nodes: null (if stopped) or list of gain nodes
+ *   - source_nodes: null (if stopped) or list of source nodes
+ *   - spectrogram: spectrogram display object 
+ *   - canvas: canvas for drawing spectrogram on
+ *   - canvas_context: context for the above canvas
+ *   - canvas_waveform: canvas for drawing waveform on (if waveform option)
+ *   - canvas_context_waveform: context for the above canvas
+ *   - controls: element containing the controls
+ *   - rewind_button: rewind button element (if rewind option)
+ *   - play_pause_button: play button element
+ * 
+ * Methods:
+ *   - playing(): returns true if currently playing
+ *   - play(): start playing the audio
+ *   - pause(): stop playing but remember the current position
+ *   - stop(): stop playing and reset current position
+ *   - rewind(): keep playing (if playing) but reset the current position
+ *   - play_pause(): pause if currently playing, play if currently stopped
+ *   - draw(): update the visuals, do not call yourself as it will cause
+ *     animation issues
+ */
 
 function SpectrogramPlayer(audio_context, source_gen, element, options) {
   options = Object.assign(
@@ -139,7 +220,7 @@ function SpectrogramPlayer(audio_context, source_gen, element, options) {
   this.rewind = () => {
     if (this.playing()) { this.stop(); this.play(); }
     else {
-      this.pausedAt = 0;
+      pausedAt = 0;
       this.spectrogram.clear();
       this.canvas_context.drawImage(this.spectrogram.offScreenCvs, 0, 0);
       if (waveform) { this.canvas_context_waveform.clearRect(0, 0, width, 100); }
@@ -154,7 +235,7 @@ function SpectrogramPlayer(audio_context, source_gen, element, options) {
     this.canvas_context.drawImage(this.spectrogram.offScreenCvs, 0, 0);
     if (waveform) {
       lftAnalyserNode.getByteTimeDomainData(time_buffer);
-      drawWaveform(this.canvas_context_waveform, time_buffer, 1024);
+      drawAlignedWaveform(this.canvas_context_waveform, time_buffer, 1024);
     }
   };
 

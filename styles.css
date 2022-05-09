@@ -4,9 +4,23 @@ table { border-collapse: collapse; }
 td { vertical-align: middle; text-align: center; white-space: nowrap; padding: 0 0.3em; }
 input { width: 100%; margin: 0; }
 input[type=range] { height: 4em; display: block; }
+select { padding: 0.5em; }
 a { color: #00cc00; }
 sup { font-size: 0.75em; display: inline-block; max-height: 0.5em; width: 0; vertical-align: 0.45em; }
 sub { font-size: 0.6em; vertical-align: -0.35em; }
+
+.button {
+  background: #555555; border-radius: 10px; padding: 0.5em; cursor: pointer; user-select: none;
+  text-shadow:
+  -1px -1px 0 #000,
+   1px -1px 0 #000,
+   -1px 1px 0 #000,
+    1px 1px 0 #000;
+}
+.button:hover {
+  background: #333333;
+  color: #CCCCCC;
+}
 
 #container { max-width: 1000px; width: 100%; margin: 0 auto; }
 
@@ -27,17 +41,17 @@ sub { font-size: 0.6em; vertical-align: -0.35em; }
 #container.fourier2 #wave { float: left; /*width: 35%;*/ padding-bottom: 15px; }
 #container.fourier2 #wave2 { float: right; /*width: 65%;*/ }
 #container.fourier2 table { margin: 0 auto; margin-top: 1.5em; }
-select { padding: 0.5em; }
-#play {
-    background: #555555; border-radius: 10px; padding: 0.5em; cursor: pointer; user-select: none;
-    text-shadow:
-  -1px -1px 0 #000,
-   1px -1px 0 #000,
-   -1px 1px 0 #000,
-    1px 1px 0 #000;
-}
 
-.spectrogram canvas { border: 1px solid white; }
+.spectrogram canvas { outline: 1px solid white; }
 .spectrogram .controls { width: 100%; text-align: center; padding: 0.5em 0; }
-.spectrogram .controls .button { margin-left: 1em; display: inline-block; font-size: 2em; line-height: 0.75em; cursor: pointer; user-select: none; }
-.spectrogram .controls .button:first-child { margin-left: 0; }
+.spectrogram .controls .button { margin: 1em; display: inline-block; font-size: 2.5em; line-height: 0.75em; }
+.spectrogram .controls .button.rewind {
+  letter-spacing: -0.1em;
+  transform: scaleX(0.8);
+  padding-right: 0.7em;
+}
+.spectrogram .controls .button.play-pause {
+  vertical-align: -0.1em;
+  padding-top: 0.6em;
+  padding-bottom: 0.4em;
+}

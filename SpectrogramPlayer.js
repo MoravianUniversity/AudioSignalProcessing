@@ -245,12 +245,14 @@ function SpectrogramPlayer(audio_context, source_gen, element, options) {
   if (has_rewind && !is_microphone) {
     this.rewind_button = this.controls.appendChild(document.createElement("span"));
     this.rewind_button.classList.add("button");
-    this.rewind_button.textContent = "⏮";
+    this.rewind_button.classList.add("rewind");
+    this.rewind_button.textContent = "◀◀" // "\u23EE\uFE0E";
     this.rewind_button.addEventListener("click", this.rewind);
   }
   this.play_pause_button = this.controls.appendChild(document.createElement("span"));
   this.play_pause_button.classList.add("button");
-  this.play_pause_button.textContent = "⏯";
+  this.play_pause_button.classList.add("play-pause");
+  this.play_pause_button.textContent = "▶||"; // "\u23EF\uFE0E";
   this.play_pause_button.addEventListener("click", this.play_pause);
   if (autoplay) { this.play(); }
 }

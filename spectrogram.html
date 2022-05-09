@@ -17,102 +17,115 @@
   <script src="pulsefft.js"></script>
   <script src="libxcorr.min.js"></script>
   <script>
-    function update_notes(e) {
-      // make sure amplitudes sum to 100
-      adjustVolumes(e, "volume-select-", num_waves);
+  function update(e) {
+    // make sure amplitudes sum to 100
+    adjustVolumes(e, "volume-select-", num_waves);
 
-      const none = "<sup style='visibility:hidden'>♯</sup>";
-      const note_names = ["C" + none, "C<sup>♯</sup>",
-                          "D" + none,
-                          "E<sup>♭</sup>", "E" + none,
-                          "F" + none, "F<sup>♯</sup>",
-                          "G" + none, "G<sup>♯</sup>",
-                          "A" + none,
-                          "B<sup>♭</sup>", "B" + none];
-      const cur_time = spec.audio_context.currentTime;
+    const none = "<sup style='visibility:hidden'>♯</sup>";
+    const note_names = ["C" + none, "C<sup>♯</sup>",
+                        "D" + none,
+                        "E<sup>♭</sup>", "E" + none,
+                        "F" + none, "F<sup>♯</sup>",
+                        "G" + none, "G<sup>♯</sup>",
+                        "A" + none,
+                        "B<sup>♭</sup>", "B" + none];
+    const cur_time = spec.audio_context.currentTime;
 
+    for (let i = 0; i < num_waves; i++) {
+      const val = +document.getElementById("note-select-"+i).value;
+      const type = document.getElementById("note-type-"+i).value;
+      const name = note_names[val % 12], octave = Math.floor(val / 12);
+      const freq = (16.351597831287414*Math.pow(2, val/12)).toFixed(2);
+      document.getElementById("note-display-"+i).innerHTML = `${name}<sub>${octave}</sub>`;
+      document.getElementById("note-freq-"+i).innerText = `${' '.repeat(7-freq.length)}${freq} Hz`;
+      if (spec.source_nodes) {
+        if (spec.source_nodes[i].frequency.value !== freq) {
+          spec.source_nodes[i].frequency.linearRampToValueAtTime(freq, cur_time + 0.1);
+        }
+        if (spec.source_nodes[i].type !== type) { spec.source_nodes[i].type = type; }
+      }
+
+      const volume = +document.getElementById("volume-select-"+i).value;
+      document.getElementById("volume-display-"+i).innerText = Math.round(volume) + "%"
+      if (spec.gain_nodes) {
+        if (spec.gain_nodes[i].gain.value !== volume/100) {
+          spec.gain_nodes[i].gain.linearRampToValueAtTime(volume/100, cur_time + 0.1);
+        }
+      }
+    }
+  }
+
+  const num_waves = 4;
+  const default_notes = [45, 57, 69, 81];
+  const default_volumes = [72, 16, 8, 4];
+  let spec;
+  function load() {
+    spec = new SpectrogramPlayer(new AudioContext(), (spec, context) => {
+      nodes = []
       for (let i = 0; i < num_waves; i++) {
+        let osc_node = context.createOscillator();
         const val = +document.getElementById("note-select-"+i).value;
-        const type = document.getElementById("note-type-"+i).value;
-        const name = note_names[val % 12], octave = Math.floor(val / 12);
-        const freq = (16.351597831287414*Math.pow(2, val/12)).toFixed(2);
-        document.getElementById("note-display-"+i).innerHTML = `${name}<sub>${octave}</sub>`;
-        document.getElementById("note-freq-"+i).innerText = `${' '.repeat(7-freq.length)}${freq} Hz`;
-        if (spec.source_nodes) {
-          if (spec.source_nodes[i].frequency.value !== freq) {
-            spec.source_nodes[i].frequency.linearRampToValueAtTime(freq, cur_time + 0.1);
-          }
-          if (spec.source_nodes[i].type !== type) { spec.source_nodes[i].type = type; }
-        }
-
-        const volume = +document.getElementById("volume-select-"+i).value;
-        document.getElementById("volume-display-"+i).innerText = Math.round(volume) + "%"
-        if (spec.gain_nodes) {
-          if (spec.gain_nodes[i].gain.value !== volume/100) {
-            spec.gain_nodes[i].gain.linearRampToValueAtTime(volume/100, cur_time + 0.1);
-          }
+        osc_node.frequency.value = 16.351597831287414*Math.pow(2, val/12);
+        osc_node.type = document.getElementById("note-type-"+i).value;
+        nodes.push(osc_node);
+      }
+      return nodes;
+    }, document.getElementById("spectrogram"), {waveform:true, rewind:false,
+      post_setup:(spec) => {
+        for (let i = 0; i < spec.gain_nodes.length; i++) {
+          const volume = +document.getElementById("volume-select-"+i).value;
+          let gn = spec.gain_nodes[i];
+          gn.gain.value = 0.00001;
+          gn.gain.linearRampToValueAtTime(volume/100, 0.1);
         }
       }
+    });
+    resize();
+
+    let table = document.getElementById("wave-design");
+    for (let i = 0; i < num_waves; i++) {
+      table.insertRow().innerHTML = `
+<td style="min-width:1.1em;max-width:1.1em;" id="note-display-${i}"></td>
+<td style="min-width:5em;max-width:5em" id="note-freq-${i}"></td>
+<td style="width:100%"><input id="note-select-${i}" type="range" min="9" max="96" value="${default_notes[i]}"></td>
+<td style="width:auto"><!--<select id="note-type-${i}">
+  <option>sine</option>
+  <option>square</option>
+  <option>sawtooth</option>
+  <option>triangle</option>
+</select>--><input type="hidden" id="note-type-${i}" value="sine"></td>`;
+      table.insertRow().innerHTML = `
+<td style="width:1.1em"></td>
+<td style="width:5em; text-align: right;" id="volume-display-${i}"></td>
+<td style="width:100%"><input id="volume-select-${i}" type="range" min="0" max="100" value="${default_volumes[i]}" step=0.1></td>
+<td></td>`;
+      document.getElementById("note-select-"+i).addEventListener("input", update);
+      //document.getElementById("note-type-"+i).addEventListener("input", update);
+      document.getElementById("volume-select-"+i).addEventListener("input", update);
     }
+    update();
+  }
 
-    const num_waves = 4;
-    const default_notes = [45, 57, 69, 81];
-    const default_volumes = [72, 16, 8, 4];
-    let spec;
-    function load_it() {
-      //xcorr.setMode('waxcorr');
-      //xcorr.setMode('gccphat');
+  function resize() {
+    const w = Math.min(document.body.clientWidth, 1000);
+    //const h = document.body.clientHeight;
 
-      spec = new SpectrogramPlayer(new AudioContext(), (spec, context) => {
-        nodes = []
-        for (let i = 0; i < num_waves; i++) {
-          let osc_node = context.createOscillator();
-          const val = +document.getElementById("note-select-"+i).value;
-          osc_node.frequency.value = 16.351597831287414*Math.pow(2, val/12);
-          osc_node.type = document.getElementById("note-type-"+i).value;
-          nodes.push(osc_node);
-        }
-        return nodes;
-      }, document.getElementById("spectrogram"), {waveform:true, rewind:false,
-        post_setup:(spec) => {
-          for (let i = 0; i < spec.gain_nodes.length; i++) {
-            const volume = +document.getElementById("volume-select-"+i).value;
-            let gn = spec.gain_nodes[i];
-            gn.gain.value = 0.00001;
-            gn.gain.linearRampToValueAtTime(volume/100, 0.1);
-          }
-        }
-      });
+    let canvas = spec.canvas;
+    canvas.width = w;
+    canvas.height = Math.min(Math.max(w/500*250, 200), 300);
 
-      let table = document.getElementById("wave-design");
-      for (let i = 0; i < num_waves; i++) {
-        table.insertRow().innerHTML = `
-  <td style="min-width:1.1em;max-width:1.1em;" id="note-display-${i}"></td>
-  <td style="min-width:5em;max-width:5em" id="note-freq-${i}"></td>
-  <td style="width:100%"><input id="note-select-${i}" type="range" min="9" max="96" value="${default_notes[i]}"></td>
-  <td style="width:auto"><!--<select id="note-type-${i}">
-    <option>sine</option>
-    <option>square</option>
-    <option>sawtooth</option>
-    <option>triangle</option>
-  </select>--><input type="hidden" id="note-type-${i}" value="sine"></td>`;
-        table.insertRow().innerHTML = `
-  <td style="width:1.1em"></td>
-  <td style="width:5em; text-align: right;" id="volume-display-${i}"></td>
-  <td style="width:100%"><input id="volume-select-${i}" type="range" min="0" max="100" value="${default_volumes[i]}" step=0.1></td>
-  <td></td>`;
-        document.getElementById("note-select-"+i).addEventListener("input", update_notes);
-        //document.getElementById("note-type-"+i).addEventListener("input", update_notes);
-        document.getElementById("volume-select-"+i).addEventListener("input", update_notes);
-      }
-      update_notes();
-    }
-    window.addEventListener("load", load_it);
+    let wave = spec.canvas_waveform;
+    wave.width = w;
+    wave.height = Math.min(Math.max(w/500*50, 40), 75);
+  }
+
+  window.addEventListener("load", load);
+  window.addEventListener("resize", resize);
   </script>
 
 <div id="container">
-<div id="spectrogram" class="spectrogram"></div>
-<table id="wave-design"></table>
+  <div id="spectrogram" class="spectrogram"></div>
+  <table id="wave-design"></table>
 </div>
 
 </body>

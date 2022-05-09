@@ -13,17 +13,14 @@
 
 <body>
 <script src="utils.js"></script>
-<script src="pulsefft.js"></script>
 <script>
-  let pulse = null;
-  //loadPulse().then((p) => { pulse = p; })
-
-  let context, audio_buffer;
+  let context, audio_buffer, audio = null, gain = null, stopping = true;
 
   /**
    * Updates all of the textual and graphical displays whenever the sample changes.
    */
   function update() {
+    stop();
     context = new AudioContext();
     audioBufferLoader(context, document.getElementById('sample').value, (buffer) => {
       audio_buffer = buffer;
@@ -36,18 +33,38 @@
         [0, 0.5*w, 1*w], ['0.98 sec', '1 sec', '1.02 sec']);
 
       data = average_down(buffer.getChannelData(0), buffer.sampleRate / 4200);
-      drawFourier(fourier_context, data, buffer.duration, 2100);
+      drawFourier(fourier_context, data, buffer.duration, 65.4101, 4186.01, true);
     });
   }
 
-  /**
-   * Play the current audio file.
-   */
+  /** Play the current audio file. */
   function play() {
-    let audio = context.createBufferSource();
-    audio.buffer = audio_buffer;
-    audio.connect(context.destination);
-    audio.start(0);
+    if (audio && !audio.ended) {
+      stop();
+    } else {
+      if (audio && audio.ended) {
+        audio.disconnect();
+        gain.disconnect();
+      }
+      audio = context.createBufferSource();
+      audio.buffer = audio_buffer;
+      gain = context.createGain();
+      audio.connect(gain);
+      gain.connect(context.destination);
+      audio.start();
+    }
+  }
+
+  /** Stop the current audio file. */
+  function stop() {
+    if (audio) {
+      let cur_audio = audio, cur_gain = gain;
+      audio.stop(context.currentTime + 0.015);
+      gain.gain.setTargetAtTime(0, context.currentTime, 0.015);
+      setTimeout(() => { cur_audio.disconnect(); cur_gain.disconnect(); }, 15);
+      audio = null;
+      gain = null;
+    }
   }
 
   function resize() {
@@ -62,9 +79,9 @@
     wave2.width = w*.6;
     wave2.height = w/500*80;
     
-    let winding = document.getElementById("fourier");
-    winding.width = w;
-    winding.height = w/500*80;
+    let fourier = document.getElementById("fourier");
+    fourier.width = w;
+    fourier.height = w/500*80;
 
     update();
   }

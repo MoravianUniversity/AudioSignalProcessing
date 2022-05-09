@@ -5,6 +5,8 @@ td { vertical-align: middle; text-align: center; white-space: nowrap; padding: 0
 input { width: 100%; margin: 0; }
 input[type=range] { height: 4em; display: block; }
 a { color: #00cc00; }
+sup { font-size: 0.75em; display: inline-block; max-height: 0.5em; width: 0; vertical-align: 0.45em; }
+sub { font-size: 0.6em; vertical-align: -0.35em; }
 
 #container { max-width: 1000px; width: 100%; margin: 0 auto; }
 
@@ -34,3 +36,8 @@ select { padding: 0.5em; }
    -1px 1px 0 #000,
     1px 1px 0 #000;
 }
+
+.spectrogram canvas { border: 1px solid white; }
+.spectrogram .controls { width: 100%; text-align: center; padding: 0.5em 0; }
+.spectrogram .controls .button { margin-left: 1em; display: inline-block; font-size: 2em; line-height: 0.75em; cursor: pointer; user-select: none; }
+.spectrogram .controls .button:first-child { margin-left: 0; }

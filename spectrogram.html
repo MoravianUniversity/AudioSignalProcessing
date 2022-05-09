@@ -1,27 +1,26 @@
 <!doctype html>
 
-<!-- TODO: Works, but needs to be integrated into the styles of the rest -->
-
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-
   <title>Audio Playground with Spectrogram</title>
-  <meta name="description" content="A tool for studying audio, the Fourier transform, and spectrograms">
   <meta name="author" content="Jeffrey Bush">
-
-  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="icon" href="favicon.png" type="image/png">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="stylesheet" href="styles.css">
 </head>
-
 <body>
-
+  <script src="utils.js"></script>
   <script src="Spectrogram-2v00.js"></script>
   <script src="SpectrogramPlayer.js"></script>
-  <!--<script src="libxcorr.min.js"></script>-->
+  <script src="pulsefft.js"></script>
+  <script src="libxcorr.min.js"></script>
   <script>
-    function update_notes() {
+    function update_notes(e) {
+      // make sure amplitudes sum to 100
+      adjustVolumes(e, "volume-select-", num_waves);
+
       const none = "<sup style='visibility:hidden'>♯</sup>";
       const note_names = ["C" + none, "C<sup>♯</sup>",
                           "D" + none,
@@ -47,7 +46,7 @@
         }
 
         const volume = +document.getElementById("volume-select-"+i).value;
-        document.getElementById("volume-display-"+i).innerText = volume + "%"
+        document.getElementById("volume-display-"+i).innerText = Math.round(volume) + "%"
         if (spec.gain_nodes) {
           if (spec.gain_nodes[i].gain.value !== volume/100) {
             spec.gain_nodes[i].gain.linearRampToValueAtTime(volume/100, cur_time + 0.1);
@@ -56,12 +55,13 @@
       }
     }
 
-    let num_waves = 5;
-    let default_notes = [45, 57, 69, 81, 93];
-    let default_volumes = [75, 32, 16, 8, 4];
+    const num_waves = 4;
+    const default_notes = [45, 57, 69, 81];
+    const default_volumes = [72, 16, 8, 4];
     let spec;
     function load_it() {
       //xcorr.setMode('waxcorr');
+      //xcorr.setMode('gccphat');
 
       spec = new SpectrogramPlayer(new AudioContext(), (spec, context) => {
         nodes = []
@@ -90,19 +90,19 @@
   <td style="min-width:1.1em;max-width:1.1em;" id="note-display-${i}"></td>
   <td style="min-width:5em;max-width:5em" id="note-freq-${i}"></td>
   <td style="width:100%"><input id="note-select-${i}" type="range" min="9" max="96" value="${default_notes[i]}"></td>
-  <td style="width:auto"><select id="note-type-${i}">
+  <td style="width:auto"><!--<select id="note-type-${i}">
     <option>sine</option>
     <option>square</option>
     <option>sawtooth</option>
     <option>triangle</option>
-  </select></td>`;
+  </select>--><input type="hidden" id="note-type-${i}" value="sine"></td>`;
         table.insertRow().innerHTML = `
   <td style="width:1.1em"></td>
   <td style="width:5em; text-align: right;" id="volume-display-${i}"></td>
-  <td style="width:100%"><input id="volume-select-${i}" type="range" min="0" max="100" value="${default_volumes[i]}"></td>
+  <td style="width:100%"><input id="volume-select-${i}" type="range" min="0" max="100" value="${default_volumes[i]}" step=0.1></td>
   <td></td>`;
         document.getElementById("note-select-"+i).addEventListener("input", update_notes);
-        document.getElementById("note-type-"+i).addEventListener("input", update_notes);
+        //document.getElementById("note-type-"+i).addEventListener("input", update_notes);
         document.getElementById("volume-select-"+i).addEventListener("input", update_notes);
       }
       update_notes();
@@ -110,24 +110,10 @@
     window.addEventListener("load", load_it);
   </script>
 
-<style>
-  body { margin: 0; }
-  .spectrogram, table { width: 100%; max-width: 500px; margin: 0 auto; }
-  .spectrogram canvas { display: block; border: 1px solid black; background-color: black; }
-  .spectrogram canvas + canvas { background-color: white; }
-  .spectrogram .controls { width: 100%; border: 1px solid black; background-color: #c4c4c4; text-align: center; padding: 0.5em 0; }
-  .spectrogram .controls .button:first-child { margin-left: 0; }
-  .spectrogram .controls .button { margin-left: 1em; display: inline-block; font-size: 2em; line-height: 0.75em; cursor: pointer; user-select: none; }
-  sup { font-size: 0.75em; display: inline-block; max-height: 0.5em; width: 0; vertical-align: 0.45em; }
-  sub { font-size: 0.6em; vertical-align: -0.35em; }
-  td { vertical-align: middle; text-align: center; white-space: nowrap; padding: 0 0.3em; }
-  td:first-child { padding-left: 0; text-align: left; }
-  td:last-child { padding-right: 0; text-align: left; }
-  input { width: 100%; }
-</style>
-
+<div id="container">
 <div id="spectrogram" class="spectrogram"></div>
 <table id="wave-design"></table>
+</div>
 
 </body>
 </html>

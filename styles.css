@@ -44,7 +44,7 @@ sub { font-size: 0.6em; vertical-align: -0.35em; }
 
 .spectrogram canvas { outline: 1px solid white; }
 .spectrogram .controls { width: 100%; text-align: center; padding: 0.5em 0; }
-.spectrogram .controls .button { margin: 1em; display: inline-block; font-size: 2.5em; line-height: 0.75em; }
+.spectrogram .controls .button { margin: 1em; display: inline-block; font-size: 1.5em; line-height: 0.75em; }
 .spectrogram .controls .button.rewind {
   letter-spacing: -0.1em;
   transform: scaleX(0.8);
@@ -55,3 +55,17 @@ sub { font-size: 0.6em; vertical-align: -0.35em; }
   padding-top: 0.6em;
   padding-bottom: 0.4em;
 }
+.spectrogram .controls .button.disabled {
+  color: #333333 !important;
+  background: #333333 !important;
+  position: relative;
+}
+.spectrogram .controls .button.disabled:after {
+  content: ' ';
+  width: 1.25em; height: 1.25em;
+  position: absolute;
+  background: url('loading.gif');
+  background-size: 1.25em 1.25em;
+  left: 0.625em; top: 0.25em;
+}
+.spectrogram .controls select { margin: 1em; font-size: 1.2em; }

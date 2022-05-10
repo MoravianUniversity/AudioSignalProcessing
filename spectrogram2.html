@@ -17,18 +17,50 @@
   <script src="pulsefft.js"></script>
   <script src="libxcorr.min.js"></script>
   <script>
-  let spec;
+  const MUSIC_FILES = [
+    ['demo', '7100668.mp3'],
+    ['aphex twin', 'aphextwin-windowlicker.mp3'],
+    ['flute scale vib', 'flute-scale-vib.mp3'],
+    ['flute scale non-vib', 'flute-scale-non-vib.mp3'],
+    ['alto sax scale vib', 'AltoSax.Vib.mf.C4B4.mp3'],
+    ['alto sax scale non-vib', 'AltoSax.NoVib.mf.C4B4.mp3'],
+  ];
+
+  let spec, audio_buffer = null;
+
+  function update() {
+    let playing = spec.playing();
+    spec.play_pause_button.classList.add("disabled");
+    spec.stop();
+    audio_buffer = null;
+    let file = document.getElementById('track-select').value;
+    audioBufferLoader(spec.audio_context, file, (buffer) => {
+      audio_buffer = buffer;
+      spec.play_pause_button.classList.remove("disabled");
+      if (playing) { spec.play(); }
+    });
+  }
 
   function load() {
-    let context = new AudioContext();
-    audioBufferLoader(context, '7100668.mp3', (buffer) => {
-      spec = new SpectrogramPlayer(context, (spec, context) => {
-        let src = context.createBufferSource();
-        src.buffer = buffer;
-        return src;
-      }, document.getElementById("spectrogram"), {waveform:true});
-      resize();
-    });
+    spec = new SpectrogramPlayer(new AudioContext(), (spec, context) => {
+      if (audio_buffer === null) { return []; }
+      let src = context.createBufferSource();
+      src.buffer = audio_buffer;
+      return src;
+    }, document.getElementById("spectrogram"), {waveform:true});
+    let choices = document.createElement('select');
+    choices.id = 'track-select';
+    spec.controls.insertBefore(choices, spec.play_pause_button);
+    for (let [text, file] of MUSIC_FILES) {
+      let option = document.createElement("option");
+      option.value = file;
+      option.text = text;
+      choices.appendChild(option);
+    }
+    choices.selectedIndex = 0;
+    choices.addEventListener('input', update);
+    resize();
+    update();
   }
 
   function resize() {
